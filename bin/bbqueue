@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+
+$:.unshift File.expand_path("../../lib", __FILE__)
+
+require "bbqueue"
+
+file = ARGV.shift or abort("Usage: bbqueue [file]")
+file = "./#{file}" unless file.match(/^[\/.]/)
+
+load file
+
