@@ -35,17 +35,13 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     end
   end
 
-  def test_initialize
-    BBQueue::Consumer.new("queue", redis: Redis.new, logger: Logger.new("/dev/null"))
-  end
-
   def test_run
     redis = Redis.new
 
     producer1 = BBQueue::Producer.new("queue1", redis: redis)
     producer2 = BBQueue::Producer.new("queue2", redis: redis)
 
-    consumer = BBQueue::Consumer.new(["queue1", "queue2"])
+    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1"))
     consumer.run_once
@@ -56,13 +52,40 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     assert_equal ["job1", "job2"], redis.lrange("results", 0, -1)
   end
 
+  def test_run_without_notification
+    redis = Redis.new
+
+    producer1 = BBQueue::Producer.new("queue1", redis: redis)
+    producer2 = BBQueue::Producer.new("queue2", redis: redis)
+
+    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
+
+    producer1.enqueue(Job.new("job1"))
+    redis.del "queue:queue1:notify"
+    consumer.run_once(timeout: 1)
+
+    producer2.enqueue(Job.new("job2"))
+    redis.del "queue:queue2:notify"
+    consumer.run_once(timeout: 1)
+
+    assert_equal ["job1", "job2"], redis.lrange("results", 0, -1)
+  end
+
+  def test_run_empty
+    redis = Redis.new
+
+    BBQueue::Consumer.new("queue", global_name: "consumer").run_once(timeout: 1)
+
+    assert_equal [], redis.lrange("results", 0, -1)
+  end
+
   def test_run_failing
     redis = Redis.new
 
     producer1 = BBQueue::Producer.new("queue1", redis: redis)
     producer2 = BBQueue::Producer.new("queue2", redis: redis)
 
-    consumer = BBQueue::Consumer.new(["queue1", "queue2"])
+    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1", failing: true))
     consumer.run_once
@@ -79,7 +102,7 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     producer1 = BBQueue::Producer.new("queue1", redis: redis)
     producer2 = BBQueue::Producer.new("queue2", redis: redis)
 
-    consumer = ForkingConsumer.new(["queue1", "queue2"])
+    consumer = ForkingConsumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1"))
     consumer.run_once
@@ -88,6 +111,10 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     consumer.run_once
 
     assert_equal ["before_fork", "after_fork", "job1", "before_fork", "after_fork", "job2"], redis.lrange("results", 0, -1)
+  end
+
+  def test_cleanup
+    raise NotImplementedError
   end
 end
 

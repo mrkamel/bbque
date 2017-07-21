@@ -20,9 +20,14 @@ class BBQueue::ProducerTest < BBQueue::TestCase
     job = Job.new("attribute")
 
     producer = BBQueue::Producer.new("queue_name")
+
+    assert_equal 0, producer.redis.llen("queue:queue_name")
+    assert_equal 0, producer.redis.zscan_each("queue:queue_name").to_a.size
+
     producer.enqueue job
 
-    assert_equal BBQueue::Serializer.dump(job), producer.redis.rpop("queue:queue_name")
+    assert_equal 1, producer.redis.llen("queue:queue_name:notify")
+    assert_equal 1, producer.redis.zscan_each("queue:queue_name").to_a.size
   end
 end
 

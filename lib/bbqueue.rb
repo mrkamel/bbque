@@ -3,6 +3,8 @@ require "bbqueue/version"
 require "bbqueue/serializer"
 require "bbqueue/producer"
 require "bbqueue/consumer"
+require "securerandom"
+require "json"
 require "logger"
 require "redis"
 

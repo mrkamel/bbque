@@ -24,5 +24,6 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "redis"
   spec.add_dependency "hooks"
+  spec.add_dependency "json"
 end
 

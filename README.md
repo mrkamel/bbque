@@ -1,9 +1,9 @@
 # BBQueue
 
-[![Build Status](https://secure.travis-ci.org/mrkamel/bbqueue.png?branch=master)](http://travis-ci.org/mrkamel/bbqueue)
-[![Code Quality](https://codeclimate.com/github/mrkamel/bbqueue.png)](https://codeclimate.com/github/mrkamel/bbqueue)
-[![Gem Version](https://badge.fury.io/rb/bbqueue.svg)](http://badge.fury.io/rb/bbqueue)
-[![Dependency Status](https://gemnasium.com/mrkamel/bbqueue.png?travis)](https://gemnasium.com/mrkamel/bbqueue)
+[![Build Status](https://secure.travis-ci.org/mrkamel/bbqueue.png?branch=master)](http://travis-ci.org/mrkamel/bbqueue-redis)
+[![Code Quality](https://codeclimate.com/github/mrkamel/bbqueue.png)](https://codeclimate.com/github/mrkamel/bbqueue-redis)
+[![Gem Version](https://badge.fury.io/rb/bbqueue.svg)](http://badge.fury.io/rb/bbqueue-redis)
+[![Dependency Status](https://gemnasium.com/mrkamel/bbqueue.png?travis)](https://gemnasium.com/mrkamel/bbqueue-redis)
 
 BBQueue is an opinionated ruby gem to queue and process background jobs. Other
 gems for this purpose usually don't work with ruby objects and serialize method
