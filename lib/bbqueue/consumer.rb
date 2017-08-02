@@ -83,7 +83,7 @@ module BBQueue
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} finished"
 
-      delete(queue_name, value)
+      delete(queue_name, value, job_key: json["job_key"])
     rescue Redis::BaseError => e
       logger.error e
 
@@ -102,18 +102,20 @@ module BBQueue
       nil
     end
 
-    def delete(queue_name, value)
+    def delete(queue_name, value, job_key:)
       @delete_script =<<-EOF
-        redis.call('zrem', 'queue:' .. ARGV[1], ARGV[2])
+        local queue_name, value, job_key = ARGV[1], ARGV[2], ARGV[3]
 
-        local json = cjson.decode(ARGV[2])
+        redis.call('zrem', 'queue:' .. queue_name, value)
 
-        if json['unique_key'] then
-          redis.call('srem', 'queue:' .. ARGV[1] .. ':unique', json['unique_key'])
+        if job_key ~= '' then
+          if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, -1) <= 0 then
+            redis.call('hdel', 'queue:' .. queue_name .. ':limits', job_key)
+          end
         end
       EOF
 
-      redis.eval(@delete_script, argv: [queue_name, value])
+      redis.eval(@delete_script, argv: [queue_name, value, job_key])
     end
 
     def dequeue_multi(queue_names)
@@ -128,17 +130,21 @@ module BBQueue
 
     def dequeue_single(queue_name)
       @dequeue_single_script =<<-EOF
-        local job = redis.call('zrange', 'queue:' .. ARGV[1], 0, 0, 'withscores')
+        local queue_name, global_name, timestamp = ARGV[1], ARGV[2], ARGV[3]
+
+        local job = redis.call('zrange', 'queue:' .. queue_name, 0, 0, 'withscores')
         local ret = nil
 
         if job[1] then
-          local json = cjson.decode(job[1])
-          json['dequeued_at'] = ARGV[3]
+          local value, score = job[1], tonumber(job[2])
+
+          local json = cjson.decode(value)
+          json['dequeued_at'] = timestamp
 
           ret = cjson.encode(json)
 
-          redis.call('zadd', 'queue:' .. ARGV[1] .. ':processing:' .. ARGV[2], job[2], ret)
-          redis.call('zrem', 'queue:' .. ARGV[1], job[1])
+          redis.call('zadd', 'queue:' .. queue_name .. ':processing:' .. global_name, score, ret)
+          redis.call('zrem', 'queue:' .. queue_name, value)
         end
 
         return ret
@@ -149,21 +155,27 @@ module BBQueue
 
     def cleanup
       @cleanup_script =<<-EOF
-        local count = redis.call('zcard', 'queue:' .. ARGV[1] .. ':processing:' .. ARGV[2])
-        local jobs = redis.call('zrange', 'queue:' .. ARGV[1] .. ':processing:' .. ARGV[2], 0, 100, 'withscores')
+        local queue_name, global_name = ARGV[1], ARGV[2]
+
+        local jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
+        local count = 0
 
         while jobs[1] do
           local i = 1
 
           while jobs[i] do
-            redis.call('zadd', 'queue:' .. ARGV[1], jobs[i + 1], jobs[i])
-            redis.call('rpush', 'queue:' .. ARGV[1] .. ':notify', '1')
-            redis.call('zrem', 'queue:' .. ARGV[1] .. ':processing:' .. ARGV[2], jobs[i])
+            local value, score = jobs[i], tonumber(jobs[i + 1])
+
+            redis.call('zadd', 'queue:' .. queue_name, score, value)
+            redis.call('rpush', 'queue:' .. queue_name .. ':notify', '1')
+            redis.call('zrem', 'queue:' .. queue_name .. ':processing:' .. global_name, value)
+
+            count = count + 1
 
             i = i + 2
           end
 
-          jobs = redis.call('zrange', 'queue:' .. ARGV[1] .. ':processing:' .. ARGV[2], 0, 100, 'withscores')
+          jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
         end
 
         return count

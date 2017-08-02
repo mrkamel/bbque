@@ -144,17 +144,17 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     producer = BBQueue::Producer.new("queue_name", redis: redis)
     consumer = BBQueue::Consumer.new("queue_name", global_name: "consumer")
 
-    producer.enqueue Job.new("job"), unique_key: "job"
+    producer.enqueue Job.new("job"), job_key: "job_key", limit: 1
 
     assert_equal 1, redis.llen("queue:queue_name:notify")
     assert_equal 1, redis.zcard("queue:queue_name")
-    assert_equal 1, redis.scard("queue:queue_name:unique")
+    assert_equal "1", redis.hget("queue:queue_name:limits", "job_key")
 
     consumer.run_once
 
     assert_equal 0, redis.llen("queue:queue_name:notify")
     assert_equal 0, redis.zcard("queue:queue_name")
-    assert_equal 0, redis.scard("queue:queue_name:unique")
+    assert_nil redis.hget("queue:queue_name:limits", "job_key")
   end
 end
 
