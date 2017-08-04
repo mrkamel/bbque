@@ -69,8 +69,6 @@ module BBQue
         run_once
       end
 
-      logger.info "#{global_name} stopping gracefully"
-
       cleanup
     end
 
