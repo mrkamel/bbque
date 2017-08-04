@@ -19,7 +19,7 @@ module BBQue
       raise(ArgumentError, "Limit must be a positive number") if limit && limit <= 0
       raise(ArgumentError, "You must specify a job key if limit is specified") if limit.to_i > 0 && job_key.nil?
 
-      serialized_object = BBQue::Serializer.dump(object)
+      serialized_object = BBQue.serializer.dump(object)
       score = ("%2i%014i" % [pri, (Time.now.to_f * 100).to_i]).to_i
 
       begin

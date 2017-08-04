@@ -75,7 +75,7 @@ module BBQue
       return unless value
 
       json = JSON.parse(value)
-      job = BBQue::Serializer.load(json["job"])
+      job = BBQue.serializer.load(json["job"])
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} started"
 

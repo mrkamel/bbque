@@ -9,5 +9,11 @@ require "json"
 require "logger"
 require "redis"
 
-module BBQue; end
+module BBQue
+  class << self
+    attr_accessor :serializer
+  end
+
+  self.serializer = BBQue::Serializer
+end
 
