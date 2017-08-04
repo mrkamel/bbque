@@ -212,6 +212,12 @@ module BBQue
       Array(queue_names).each do |queue_name|
         redis.eval(@cleanup_script, argv: [queue_name, global_name])
       end
+    rescue Redis::BaseError => e
+      logger.error e
+
+      sleep 5
+
+      retry
     end
   end
 end
