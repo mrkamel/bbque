@@ -1,7 +1,7 @@
 
 require File.expand_path("../../test_helper", __FILE__)
 
-class BBQueue::ConsumerTest < BBQueue::TestCase
+class BBQue::ConsumerTest < BBQue::TestCase
   class Job
     attr_accessor :attribute, :failing
 
@@ -21,7 +21,7 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
     end
   end
 
-  class ForkingConsumer < BBQueue::Consumer
+  class ForkingConsumer < BBQue::Consumer
     def fork?
       true
     end
@@ -38,10 +38,10 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_run
     redis = Redis.new
 
-    producer1 = BBQueue::Producer.new("queue1", redis: redis)
-    producer2 = BBQueue::Producer.new("queue2", redis: redis)
+    producer1 = BBQue::Producer.new("queue1", redis: redis)
+    producer2 = BBQue::Producer.new("queue2", redis: redis)
 
-    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
+    consumer = BBQue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1"))
     consumer.run_once
@@ -55,10 +55,10 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_run_without_notification
     redis = Redis.new
 
-    producer1 = BBQueue::Producer.new("queue1", redis: redis)
-    producer2 = BBQueue::Producer.new("queue2", redis: redis)
+    producer1 = BBQue::Producer.new("queue1", redis: redis)
+    producer2 = BBQue::Producer.new("queue2", redis: redis)
 
-    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
+    consumer = BBQue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1"))
     redis.del "queue:queue1:notify"
@@ -74,7 +74,7 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_run_empty
     redis = Redis.new
 
-    BBQueue::Consumer.new("queue", global_name: "consumer").run_once(timeout: 1)
+    BBQue::Consumer.new("queue", global_name: "consumer").run_once(timeout: 1)
 
     assert_equal [], redis.lrange("results", 0, -1)
   end
@@ -82,10 +82,10 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_run_failing
     redis = Redis.new
 
-    producer1 = BBQueue::Producer.new("queue1", redis: redis)
-    producer2 = BBQueue::Producer.new("queue2", redis: redis)
+    producer1 = BBQue::Producer.new("queue1", redis: redis)
+    producer2 = BBQue::Producer.new("queue2", redis: redis)
 
-    consumer = BBQueue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
+    consumer = BBQue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
 
     producer1.enqueue(Job.new("job1", failing: true))
     consumer.run_once
@@ -99,8 +99,8 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_run_forking
     redis = Redis.new
 
-    producer1 = BBQueue::Producer.new("queue1", redis: redis)
-    producer2 = BBQueue::Producer.new("queue2", redis: redis)
+    producer1 = BBQue::Producer.new("queue1", redis: redis)
+    producer2 = BBQue::Producer.new("queue2", redis: redis)
 
     consumer = ForkingConsumer.new(["queue1", "queue2"], global_name: "consumer")
 
@@ -116,8 +116,8 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_cleanup
     redis = Redis.new
 
-    producer = BBQueue::Producer.new("queue_name", redis: redis)
-    consumer = BBQueue::Consumer.new("queue_name", global_name: "consumer")
+    producer = BBQue::Producer.new("queue_name", redis: redis)
+    consumer = BBQue::Consumer.new("queue_name", global_name: "consumer")
 
     producer.enqueue Job.new("job")
 
@@ -141,8 +141,8 @@ class BBQueue::ConsumerTest < BBQueue::TestCase
   def test_delete
     redis = Redis.new
 
-    producer = BBQueue::Producer.new("queue_name", redis: redis)
-    consumer = BBQueue::Consumer.new("queue_name", global_name: "consumer")
+    producer = BBQue::Producer.new("queue_name", redis: redis)
+    consumer = BBQue::Consumer.new("queue_name", global_name: "consumer")
 
     producer.enqueue Job.new("job"), job_key: "job_key", limit: 1
 

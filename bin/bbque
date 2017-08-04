@@ -2,9 +2,9 @@
 
 $:.unshift File.expand_path("../../lib", __FILE__)
 
-require "bbqueue"
+require "bbque"
 
-file = ARGV.shift or abort("Usage: bbqueue [file]")
+file = ARGV.shift or abort("Usage: bbque [file]")
 file = "./#{file}" unless file.match(/^[\/.]/)
 
 load file

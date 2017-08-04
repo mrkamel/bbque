@@ -1,19 +1,17 @@
-# BBQueue
+# BBQue
 
-[![Build Status](https://secure.travis-ci.org/mrkamel/bbqueue.png?branch=master)](http://travis-ci.org/mrkamel/bbqueue-redis)
-[![Code Quality](https://codeclimate.com/github/mrkamel/bbqueue.png)](https://codeclimate.com/github/mrkamel/bbqueue-redis)
-[![Gem Version](https://badge.fury.io/rb/bbqueue.svg)](http://badge.fury.io/rb/bbqueue-redis)
-[![Dependency Status](https://gemnasium.com/mrkamel/bbqueue.png?travis)](https://gemnasium.com/mrkamel/bbqueue-redis)
+[![Build Status](https://secure.travis-ci.org/mrkamel/bbque.png?branch=master)](http://travis-ci.org/mrkamel/bbque)
+[![Gem Version](https://badge.fury.io/rb/bbque.svg)](http://badge.fury.io/rb/bbque)
 
-BBQueue is an opinionated ruby gem to queue and process background jobs. Other
+BBQue is an opinionated ruby gem to queue and process background jobs. Other
 gems for this purpose usually don't work with ruby objects and serialize method
-arguments only. Instead, BBQueue jobs are simple ruby objects:
+arguments only. Instead, BBQue jobs are simple ruby objects:
 
 ```ruby
 MyQueue.enqueue MyJob.new
 ```
 
-BBQueue jobs need to fulfill the following interface:
+BBQue jobs need to fulfill the following interface:
 
 1. The object contains an instance method `#work` without any arguments
 2. The object (instance) must be serializable via `Marshal.dump` and `Marshal.load`
@@ -23,7 +21,7 @@ BBQueue jobs need to fulfill the following interface:
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'bbqueue'
+gem 'bbque'
 ```
 
 And then execute:
@@ -32,24 +30,24 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install bbqueue
+    $ gem install bbque
 
 ## Usage
 
-BBQueue is using Redis. Therefore, you have to install Redis first.
+BBQue is using Redis. Therefore, you have to install Redis first.
 
 ### Producer
 
 To enqueue a job, you need a Producer instance:
 
 ```ruby
-SomeQueue = BBQueue::Producer.new("default")
+SomeQueue = BBQue::Producer.new("default")
 ```
 
 where `default` is the queue name. You can additionally pass a logger and/or the Redis instance:
 
 ```ruby
-SomeQueue = BBQueue::Producer.new("default", redis: Redis.new, logger: Logger.new(...))
+SomeQueue = BBQue::Producer.new("default", redis: Redis.new, logger: Logger.new(...))
 ```
 
 Then enqueue a job:
@@ -79,29 +77,29 @@ end
 To process the enqueued jobs, create a file, e.g. jobs.rb:
 
 ```ruby
-BBQueue::Consumer.new("default").run
+BBQue::Consumer.new("default").run
 ```
 
 and run it via:
 
-    $ bbqueue jobs.rb
+    $ bbque jobs.rb
 
-BBQueue will loop through all the jobs, run them, and will then wait for new
+BBQue will loop through all the jobs, run them, and will then wait for new
 ones (no polling). You can pass multiple queue names, the Redis instance and a logger.
 
 ```ruby
-BBQueue::Consumer.new(["default", "important"], logger: ..., redis: ...).run
+BBQue::Consumer.new(["default", "important"], logger: ..., redis: ...).run
 ```
 
 ### Forking Consumers
 
-By default, BBQueue does not fork a process for every job, but
+By default, BBQue does not fork a process for every job, but
 it already ships with the ability to do so.
 
-To make BBQueue fork, create a custom consumer:
+To make BBQue fork, create a custom consumer:
 
 ```ruby
-class ForkingConsumer < BBQueue::Consumer
+class ForkingConsumer < BBQue::Consumer
   def fork?
     true
   end
@@ -116,11 +114,19 @@ class ForkingConsumer < BBQueue::Consumer
 end
 ```
 
-Then, start your custom consumer in favor of BBQueue's default one:
+Then, start your custom consumer in favor of BBQue's default one:
 
 ```ruby
 ForkingConsumer.new(["queue1", "queue2", ...], ...).run
 ```
+
+## Job Limit
+
+TODO
+
+## Delay
+
+TODO
 
 ## Graceful Termination
 
@@ -129,7 +135,7 @@ The worker will finish its current job and terminate afterwards.
 
 ## Contributing
 
-1. Fork it ( https://github.com/mrkamel/bbqueue/fork )
+1. Fork it ( https://github.com/mrkamel/bbque/fork )
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)

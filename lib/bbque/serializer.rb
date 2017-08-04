@@ -1,7 +1,7 @@
 
 require "base64"
 
-module BBQueue
+module BBQue
   module Serializer
     def self.dump(object)
       Base64.strict_encode64 Marshal.dump(object)

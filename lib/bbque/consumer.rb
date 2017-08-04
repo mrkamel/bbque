@@ -1,5 +1,5 @@
 
-module BBQueue
+module BBQue
   class Consumer
     attr_accessor :queue_names, :global_name, :redis, :logger
 
@@ -75,7 +75,7 @@ module BBQueue
       return unless value
 
       json = JSON.parse(value)
-      job = BBQueue::Serializer.load(json["job"])
+      job = BBQue::Serializer.load(json["job"])
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} started"
 

@@ -1,16 +1,16 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'bbqueue/version'
+require 'bbque/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "bbqueue-redis"
-  spec.version       = BBQueue::VERSION
+  spec.name          = "bbque"
+  spec.version       = BBQue::VERSION
   spec.authors       = ["Benjamin Vetter"]
   spec.email         = ["vetter@plainpicture.de"]
   spec.summary       = %q{Queue and process ruby job objects in the background}
   spec.description   = %q{Queue and process ruby job objects in the background}
-  spec.homepage      = "https://github.com/mrkamel/bbqueue-redis"
+  spec.homepage      = "https://github.com/mrkamel/bbque"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")

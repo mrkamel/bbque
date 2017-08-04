@@ -1,5 +1,5 @@
 
-module BBQueue
+module BBQue
   class Scheduler
     attr_accessor :redis, :logger
 
@@ -29,7 +29,7 @@ module BBQueue
         local timestamp = tonumber(ARGV[1])
         local count = 0
 
-        local jobs = redis.call('zrange', 'bbqueue:scheduler', 0, 100, 'withscores')
+        local jobs = redis.call('zrange', 'bbque:scheduler', 0, 100, 'withscores')
 
         while jobs[1] do
           local i = 1
@@ -43,7 +43,7 @@ module BBQueue
 
               redis.call('zadd', 'queue:' .. job['queue'], tonumber(job['score']), job['value'])
               redis.call('rpush', 'queue:' .. job['queue'] .. ':notify', '1')
-              redis.call('zrem', 'bbqueue:scheduler', value)
+              redis.call('zrem', 'bbque:scheduler', value)
 
               i = i + 2
 
@@ -53,7 +53,7 @@ module BBQueue
             end
           end
 
-          jobs = redis.call('zrange', 'bbqueue:scheduler', 0, 100, 'withscores')
+          jobs = redis.call('zrange', 'bbque:scheduler', 0, 100, 'withscores')
         end
 
         return count

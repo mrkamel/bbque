@@ -1,7 +1,7 @@
 
 require File.expand_path("../../test_helper", __FILE__)
 
-class BBQueue::SerializerTest < MiniTest::Test
+class BBQue::SerializerTest < MiniTest::Test
   class Job
     attr_accessor :attribute
 
@@ -20,8 +20,8 @@ class BBQueue::SerializerTest < MiniTest::Test
 
     refute_equal job1, job2
 
-    assert_equal job1, BBQueue::Serializer.load(BBQueue::Serializer.dump(job1))
-    assert_equal job2, BBQueue::Serializer.load(BBQueue::Serializer.dump(job2))
+    assert_equal job1, BBQue::Serializer.load(BBQue::Serializer.dump(job1))
+    assert_equal job2, BBQue::Serializer.load(BBQue::Serializer.dump(job2))
   end
 end
 
