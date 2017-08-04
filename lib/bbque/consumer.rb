@@ -47,28 +47,38 @@ module BBQue
       self.global_name = global_name
       self.redis = redis
       self.logger = logger
+
+      @stop_mutex = Mutex.new
+      @stopping = false
+
+      @wakeup_queue = Queue.new
     end
 
     def run
       cleanup
 
       trap "QUIT" do
-        @stopping = true
+        Thread.new { stop }
       end
 
       trap "USR2" do
-        @stopping = true
+        Thread.new { stop }
       end
 
-      until @stopping
+      until stopping?
         run_once
       end
+
+      logger.info "#{global_name} stopping gracefully"
 
       cleanup
     end
 
-    def run_once(timeout: 30)
+    def run_once(timeout: 5)
       queue_name = await_wakeup(timeout)
+
+      return if stopping?
+
       value = dequeue_single(queue_name) if queue_name
       queue_name, value = dequeue_multi(queue_names) unless value
 
@@ -94,12 +104,28 @@ module BBQue
 
     private
 
+    def stop
+      @stop_mutex.synchronize do
+        @stopping = true
+      end
+
+      @wakeup_queue.enq(nil)
+    end
+
+    def stopping?
+      @stop_mutex.synchronize do
+        @stopping
+      end
+    end
+
     def await_wakeup(timeout)
-      key, _ = redis.blpop(Array(queue_names).map { |queue_name| "queue:#{queue_name}:notify" }, timeout)
+      Thread.new do
+        key, _ = redis.blpop(Array(queue_names).map { |queue_name| "queue:#{queue_name}:notify" }.shuffle, timeout)
 
-      return key.gsub(/^queue:|:notify$/, "") if key
+        @wakeup_queue.enq(key ? key.gsub(/^queue:|:notify$/, "") : nil)
+      end
 
-      nil
+      @wakeup_queue.deq
     end
 
     def delete(queue_name, value, job_key:)
@@ -119,7 +145,7 @@ module BBQue
     end
 
     def dequeue_multi(queue_names)
-      Array(queue_names).each do |queue_name|
+      Array(queue_names).shuffle.each do |queue_name|
         if job = dequeue_single(queue_name)
           return [queue_name, job]
         end
@@ -176,6 +202,10 @@ module BBQue
           end
 
           jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
+        end
+
+        for i = 1, redis.call('zcard', 'queue:' .. queue_name) - redis.call('llen', 'queue:' .. queue_name .. ':notify') do
+          redis.call('rpush', 'queue:' .. queue_name .. ':notify', '1')
         end
 
         return count
