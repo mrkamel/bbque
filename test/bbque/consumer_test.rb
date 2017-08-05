@@ -3,17 +3,14 @@ require File.expand_path("../../test_helper", __FILE__)
 
 class BBQue::ConsumerTest < BBQue::TestCase
   class Job
-    attr_accessor :attribute, :failing
+    attr_accessor :attribute
 
-    def initialize(attribute, failing: false)
+    def initialize(attribute)
       self.attribute = attribute
-      self.failing = failing
     end
 
     def work
       redis.rpush("results", attribute)
-
-      raise if failing
     end
 
     def redis
@@ -79,23 +76,6 @@ class BBQue::ConsumerTest < BBQue::TestCase
     assert_equal [], redis.lrange("results", 0, -1)
   end
 
-  def test_run_failing
-    redis = Redis.new
-
-    producer1 = BBQue::Producer.new("queue1", redis: redis)
-    producer2 = BBQue::Producer.new("queue2", redis: redis)
-
-    consumer = BBQue::Consumer.new(["queue1", "queue2"], global_name: "consumer")
-
-    producer1.enqueue(Job.new("job1", failing: true))
-    consumer.run_once
-
-    producer2.enqueue(Job.new("job2", failing: true))
-    consumer.run_once
-
-    assert_equal ["job1", "job2"], redis.lrange("results", 0, -1)
-  end
-
   def test_run_forking
     redis = Redis.new
 
@@ -155,6 +135,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
     assert_equal 0, redis.llen("queue:queue_name:notify")
     assert_equal 0, redis.zcard("queue:queue_name")
     assert_nil redis.hget("queue:queue_name:limits", "job_key")
+    assert_equal 0, redis.zcard("queue:queue_name:processing:consumer")
   end
 end
 

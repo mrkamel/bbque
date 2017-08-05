@@ -128,9 +128,9 @@ module BBQue
 
     def delete(queue_name, value, job_key:)
       @delete_script =<<-EOF
-        local queue_name, value, job_key = ARGV[1], ARGV[2], ARGV[3]
+        local queue_name, value, global_name, job_key = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 
-        redis.call('zrem', 'queue:' .. queue_name, value)
+        redis.call('zrem', 'queue:' .. queue_name .. ':processing:' .. global_name, value)
 
         if job_key ~= '' then
           if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, -1) <= 0 then
@@ -139,7 +139,7 @@ module BBQue
         end
       EOF
 
-      redis.eval(@delete_script, argv: [queue_name, value, job_key])
+      redis.eval(@delete_script, argv: [queue_name, value, global_name, job_key])
     end
 
     def dequeue_multi(queue_names)
