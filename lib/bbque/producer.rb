@@ -47,6 +47,7 @@ module BBQue
         value = {}
         value[:enqueued_at] = Time.now.utc.strftime("%F")
         value[:job_key] = job_key
+        value[:job_id] = SecureRandom.hex
         value[:job] = serialized_object
 
         result = redis.eval(
