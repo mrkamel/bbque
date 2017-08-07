@@ -38,7 +38,7 @@ module BBQue
             redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, score = score, value = value }))
           else
             redis.call('zadd', 'queue:' .. queue_name, score, value)
-            redis.call('rpush', 'queue:' .. queue_name .. ':notify', '1')
+            redis.call('lpush', 'queue:' .. queue_name .. ':notify', '1')
           end
 
           return true

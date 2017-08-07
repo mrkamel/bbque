@@ -1,7 +1,7 @@
 
 module BBQue
   class Consumer
-    attr_accessor :queue_names, :global_name, :redis, :logger
+    attr_accessor :queue_name, :global_name, :redis, :logger
 
     def before_fork
       # Nothing
@@ -31,7 +31,7 @@ module BBQue
       end
     end
 
-    def work(job, queue_name)
+    def work(job)
       fork_and_wait do
         begin
           job.work
@@ -42,8 +42,8 @@ module BBQue
       end
     end
 
-    def initialize(queue_names, global_name:, redis: Redis.new, logger: Logger.new("/dev/null"))
-      self.queue_names = queue_names
+    def initialize(queue_name, global_name:, redis: Redis.new, logger: Logger.new("/dev/null"))
+      self.queue_name = queue_name
       self.global_name = global_name
       self.redis = redis
       self.logger = logger
@@ -73,12 +73,11 @@ module BBQue
     end
 
     def run_once(timeout: 5)
-      queue_name = await_wakeup(timeout)
+      await_wakeup(timeout)
 
       return if stopping?
 
-      value = dequeue_single(queue_name) if queue_name
-      queue_name, value = dequeue_multi(queue_names) unless value
+      value = dequeue
 
       return unless value
 
@@ -87,11 +86,11 @@ module BBQue
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} started"
 
-      work(job, queue_name)
+      work(job)
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} finished"
 
-      delete(queue_name, value, job_key: json["job_key"])
+      delete(value, job_key: json["job_key"])
     rescue Redis::BaseError => e
       logger.error e
 
@@ -118,15 +117,13 @@ module BBQue
 
     def await_wakeup(timeout)
       Thread.new do
-        key, _ = redis.blpop(Array(queue_names).map { |queue_name| "queue:#{queue_name}:notify" }.shuffle, timeout)
-
-        @wakeup_queue.enq(key ? key.gsub(/^queue:|:notify$/, "") : nil)
+        @wakeup_queue.enq redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", timeout)
       end
 
       @wakeup_queue.deq
     end
 
-    def delete(queue_name, value, job_key:)
+    def delete(value, job_key:)
       @delete_script =<<-EOF
         local queue_name, value, global_name, job_key = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 
@@ -142,18 +139,8 @@ module BBQue
       redis.eval(@delete_script, argv: [queue_name, value, global_name, job_key])
     end
 
-    def dequeue_multi(queue_names)
-      Array(queue_names).shuffle.each do |queue_name|
-        if job = dequeue_single(queue_name)
-          return [queue_name, job]
-        end
-      end
-
-      nil
-    end
-
-    def dequeue_single(queue_name)
-      @dequeue_single_script =<<-EOF
+    def dequeue
+      @dequeue_script =<<-EOF
         local queue_name, global_name, timestamp = ARGV[1], ARGV[2], ARGV[3]
 
         local job = redis.call('zrange', 'queue:' .. queue_name, 0, 0, 'withscores')
@@ -171,10 +158,12 @@ module BBQue
           redis.call('zrem', 'queue:' .. queue_name, value)
         end
 
+        redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
+
         return ret
       EOF
 
-      redis.eval(@dequeue_single_script, argv: [queue_name, global_name, Time.now.utc.strftime("%F")])
+      redis.eval(@dequeue_script, argv: [queue_name, global_name, Time.now.utc.strftime("%F")])
     end
 
     def cleanup
@@ -202,16 +191,16 @@ module BBQue
           jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
         end
 
-        for i = 1, redis.call('zcard', 'queue:' .. queue_name) - redis.call('llen', 'queue:' .. queue_name .. ':notify') do
-          redis.call('rpush', 'queue:' .. queue_name .. ':notify', '1')
+        local notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
+
+        while notification do
+          redis.call('lpush', 'queue:' .. queue_name .. ':notify', notification)
         end
 
         return count
       EOF
 
-      Array(queue_names).each do |queue_name|
-        redis.eval(@cleanup_script, argv: [queue_name, global_name])
-      end
+      redis.eval(@cleanup_script, argv: [queue_name, global_name])
     rescue Redis::BaseError => e
       logger.error e
 
