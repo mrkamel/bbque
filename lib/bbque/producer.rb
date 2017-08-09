@@ -15,16 +15,15 @@ module BBQue
     def enqueue(object, pri: 0, job_key: nil, limit: nil, delay: nil)
       logger.info "Enqueue #{object.inspect} on #{queue_name.inspect}"
 
-      raise(ArgumentError, "Invalid priority, must be between -64 and 64") unless pri.between?(-64, 64)
+      raise(ArgumentError, "Invalid priority, must be between -512 and 512") unless pri.between?(-512, 512)
       raise(ArgumentError, "Limit must be a positive number") if limit && limit <= 0
       raise(ArgumentError, "You must specify a job key if limit is specified") if limit.to_i > 0 && job_key.nil?
 
       serialized_object = BBQue.serializer.dump(object)
-      score = ("%2i%014i" % [pri, (Time.now.to_f * 100).to_i]).to_i
 
       begin
         @enqueue_script ||=<<-EOF
-          local queue_name, score, value, job_key, limit, delay = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], tonumber(ARGV[5]), tonumber(ARGV[6])
+          local queue_name, pri, value, job_key, limit, delay = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], tonumber(ARGV[5]), tonumber(ARGV[6])
 
           if limit > 0 and job_key ~= '' then
             if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, 1) > limit then
@@ -35,9 +34,9 @@ module BBQue
           end
 
           if delay then
-            redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, score = score, value = value }))
+            redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, pri = pri, value = value }))
           else
-            redis.call('zadd', 'queue:' .. queue_name, score, value)
+            redis.call('zadd', 'queue:' .. queue_name, tonumber(string.format('%i%013i', pri, redis.call('zcard', 'queue:' .. queue_name))), value)
             redis.call('lpush', 'queue:' .. queue_name .. ':notify', '1')
           end
 
@@ -48,13 +47,14 @@ module BBQue
         value[:enqueued_at] = Time.now.utc.strftime("%F")
         value[:job_key] = job_key
         value[:job_id] = SecureRandom.hex
+        value[:pri] = pri
         value[:job] = serialized_object
 
         result = redis.eval(
           @enqueue_script,
           argv: [
             queue_name,
-            score,
+            pri,
             JSON.generate(value),
             job_key,
             limit || 0,

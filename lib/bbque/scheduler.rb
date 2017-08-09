@@ -41,7 +41,7 @@ module BBQue
             if score <= timestamp then
               local job = cjson.decode(value)
 
-              redis.call('zadd', 'queue:' .. job['queue'], tonumber(job['score']), job['value'])
+              redis.call('zadd', 'queue:' .. job['queue'], tonumber(string.format('%i%013i', tonumber(job['pri']), redis.call('zcard', 'queue:' .. job['queue']))), job['value'])
               redis.call('rpush', 'queue:' .. job['queue'] .. ':notify', '1')
               redis.call('zrem', 'bbque:scheduler', value)
 

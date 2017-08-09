@@ -127,7 +127,8 @@ module BBQue
       @delete_script =<<-EOF
         local queue_name, value, global_name, job_key = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 
-        redis.call('zrem', 'queue:' .. queue_name .. ':processing:' .. global_name, value)
+        redis.call('lrem', 'queue:' .. queue_name .. ':processing:' .. global_name, 1, value)
+        redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
 
         if job_key ~= '' then
           if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, -1) <= 0 then
@@ -142,23 +143,27 @@ module BBQue
     def dequeue
       @dequeue_script =<<-EOF
         local queue_name, global_name, timestamp = ARGV[1], ARGV[2], ARGV[3]
+        local job, ret = nil, nil
 
-        local job = redis.call('zrange', 'queue:' .. queue_name, 0, 0, 'withscores')
-        local ret = nil
+        job = redis.call('rpop', 'queue:' .. queue_name .. ':retry')
 
-        if job[1] then
-          local value, score = job[1], tonumber(job[2])
+        if not job then
+          local jobs = redis.call('zrange', 'queue:' .. queue_name, 0, 0)
 
-          local json = cjson.decode(value)
+          if jobs[1] then
+            job = jobs[1]
+          end
+        end
+
+        if job then
+          local json = cjson.decode(job)
           json['dequeued_at'] = timestamp
 
           ret = cjson.encode(json)
 
-          redis.call('zadd', 'queue:' .. queue_name .. ':processing:' .. global_name, score, ret)
-          redis.call('zrem', 'queue:' .. queue_name, value)
+          redis.call('lpush', 'queue:' .. queue_name .. ':processing:' .. global_name, ret)
+          redis.call('zrem', 'queue:' .. queue_name, job)
         end
-
-        redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
 
         return ret
       EOF
@@ -169,32 +174,24 @@ module BBQue
     def cleanup
       @cleanup_script =<<-EOF
         local queue_name, global_name = ARGV[1], ARGV[2]
-
-        local jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
         local count = 0
 
-        while jobs[1] do
-          local i = 1
+        local job = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
 
-          while jobs[i] do
-            local value, score = jobs[i], tonumber(jobs[i + 1])
+        while job do
+          redis.call('lpush', 'queue:' .. queue_name .. ':retry', job)
 
-            redis.call('zadd', 'queue:' .. queue_name, score, value)
-            redis.call('rpush', 'queue:' .. queue_name .. ':notify', '1')
-            redis.call('zrem', 'queue:' .. queue_name .. ':processing:' .. global_name, value)
+          count = count + 1
 
-            count = count + 1
-
-            i = i + 2
-          end
-
-          jobs = redis.call('zrange', 'queue:' .. queue_name .. ':processing:' .. global_name, 0, 100, 'withscores')
+          job = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
         end
 
         local notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
 
         while notification do
           redis.call('lpush', 'queue:' .. queue_name .. ':notify', notification)
+
+          notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
         end
 
         return count

@@ -36,7 +36,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
     redis = Redis.new
 
     producer = BBQue::Producer.new("queue", redis: redis)
-    consumer = BBQue::Consumer.new("queue", global_name: "consumer")
+    consumer = BBQue::Consumer.new("queue", redis: redis, global_name: "consumer")
 
     producer.enqueue(Job.new("job1"))
     consumer.run_once
@@ -50,7 +50,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
   def test_run_empty
     redis = Redis.new
 
-    BBQue::Consumer.new("queue", global_name: "consumer").run_once(timeout: 1)
+    BBQue::Consumer.new("queue", redis: redis, global_name: "consumer").run_once(timeout: 1)
 
     assert_equal [], redis.lrange("results", 0, -1)
   end
@@ -59,7 +59,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
     redis = Redis.new
 
     producer = BBQue::Producer.new("queue", redis: redis)
-    consumer = ForkingConsumer.new("queue", global_name: "consumer")
+    consumer = ForkingConsumer.new("queue", redis: redis, global_name: "consumer")
 
     producer.enqueue(Job.new("job1"))
     consumer.run_once
@@ -70,11 +70,31 @@ class BBQue::ConsumerTest < BBQue::TestCase
     assert_equal ["before_fork", "after_fork", "job1", "before_fork", "after_fork", "job2"], redis.lrange("results", 0, -1)
   end
 
+  def test_retry
+    redis = Redis.new
+
+    producer = BBQue::Producer.new("queue_name", redis: redis)
+    consumer = BBQue::Consumer.new("queue_name", redis: redis, global_name: "consumer")
+
+    producer.enqueue(Job.new("job1"))
+
+    redis.lpush("queue:queue_name:retry", JSON.dump(job: BBQue::Serializer.dump(Job.new("job2"))))
+    redis.lpush("queue:queue_name:notify", "1")
+
+    consumer.run_once
+    consumer.run_once
+
+    assert_equal 0, redis.llen("queue:queue_name:retry")
+    assert_equal 0, redis.llen("queue_queue_name:notify")
+
+    assert_equal ["job2", "job1"], redis.lrange("results", 0, -1)
+  end
+
   def test_cleanup
     redis = Redis.new
 
     producer = BBQue::Producer.new("queue_name", redis: redis)
-    consumer = BBQue::Consumer.new("queue_name", global_name: "consumer")
+    consumer = BBQue::Consumer.new("queue_name", redis: redis, global_name: "consumer")
 
     producer.enqueue Job.new("job")
 
@@ -82,24 +102,27 @@ class BBQue::ConsumerTest < BBQue::TestCase
     assert_equal 1, redis.llen("queue:queue_name:notify")
     assert_equal 1, redis.zcard("queue:queue_name")
 
-    consumer.send(:dequeue)
+    assert consumer.send(:dequeue)
 
-    assert_equal 1, redis.zcard("queue:queue_name:processing:consumer")
+    assert_equal 1, redis.llen("queue:queue_name:processing:consumer")
     assert_equal 1, redis.llen("queue:queue_name:notify")
     assert_equal 0, redis.zcard("queue:queue_name")
 
+    redis.lpush "queue:queue_name:notifications:consumer", "1"
+
     consumer.send(:cleanup)
 
-    assert_equal 0, redis.zcard("queue:queue_name:processing:consumer")
+    assert_equal 0, redis.llen("queue:queue_name:notifications:consumer")
+    assert_equal 0, redis.llen("queue:queue_name:processing:consumer")
     assert_equal 2, redis.llen("queue:queue_name:notify")
-    assert_equal 1, redis.zcard("queue:queue_name")
+    assert_equal 1, redis.llen("queue:queue_name:retry")
   end
 
   def test_delete
     redis = Redis.new
 
     producer = BBQue::Producer.new("queue_name", redis: redis)
-    consumer = BBQue::Consumer.new("queue_name", global_name: "consumer")
+    consumer = BBQue::Consumer.new("queue_name", redis: redis, global_name: "consumer")
 
     producer.enqueue Job.new("job"), job_key: "job_key", limit: 1
 
@@ -111,8 +134,9 @@ class BBQue::ConsumerTest < BBQue::TestCase
 
     assert_equal 0, redis.llen("queue:queue_name:notify")
     assert_equal 0, redis.zcard("queue:queue_name")
-    assert_nil redis.hget("queue:queue_name:limits", "job_key")
     assert_equal 0, redis.zcard("queue:queue_name:processing:consumer")
+    assert_equal 0, redis.zcard("queue:queue_name:notifications:consumer")
+    assert_nil redis.hget("queue:queue_name:limits", "job_key")
   end
 end
 
