@@ -44,10 +44,11 @@ To enqueue a job, you need a Producer instance:
 SomeQueue = BBQue::Producer.new("default")
 ```
 
-where `default` is the queue name. You can additionally pass a logger and/or the Redis instance:
+where `default` is the queue name. You can additionally pass a delay, priority
+(-512 ... 512, higher is better, default is 0), logger and/or the Redis instance:
 
 ```ruby
-SomeQueue = BBQue::Producer.new("default", redis: Redis.new, logger: Logger.new(...))
+SomeQueue = BBQue::Producer.new("default", delay: 2.hours, pri: 20, redis: Redis.new, logger: Logger.new(...))
 ```
 
 Then enqueue a job:
