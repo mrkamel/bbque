@@ -90,7 +90,7 @@ module BBQue
 
       logger.info "Job #{job.inspect} on #{queue_name.inspect} finished"
 
-      delete(value, job_key: json["job_key"])
+      delete(json["job_id"], job_key: json["job_key"])
     rescue Redis::BaseError => e
       logger.error e
 
@@ -123,12 +123,13 @@ module BBQue
       @wakeup_queue.deq
     end
 
-    def delete(value, job_key:)
+    def delete(job_id, job_key:)
       @delete_script =<<-EOF
-        local queue_name, value, global_name, job_key = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
+        local queue_name, job_id, global_name, job_key = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 
-        redis.call('lrem', 'queue:' .. queue_name .. ':processing:' .. global_name, 1, value)
+        redis.call('lrem', 'queue:' .. queue_name .. ':processing:' .. global_name, 1, job_id)
         redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
+        redis.call('hdel', 'queue:' .. queue_name .. ':jobs', job_id)
 
         if job_key ~= '' then
           if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, -1) <= 0 then
@@ -137,35 +138,34 @@ module BBQue
         end
       EOF
 
-      redis.eval(@delete_script, argv: [queue_name, value, global_name, job_key])
+      redis.eval(@delete_script, argv: [queue_name, job_id, global_name, job_key])
     end
 
     def dequeue
       @dequeue_script =<<-EOF
         local queue_name, global_name, timestamp = ARGV[1], ARGV[2], ARGV[3]
-        local job, ret = nil, nil
+        local job_id, job = nil, nil
 
-        job = redis.call('rpop', 'queue:' .. queue_name .. ':retry')
+        job_id = redis.call('rpop', 'queue:' .. queue_name .. ':retry')
 
-        if not job then
-          local jobs = redis.call('zrange', 'queue:' .. queue_name, 0, 0)
+        if not job_id then
+          local job_ids = redis.call('zrange', 'queue:' .. queue_name, 0, 0)
 
-          if jobs[1] then
-            job = jobs[1]
+          if job_ids[1] then
+            job_id = job_ids[1]
           end
         end
 
-        if job then
-          local json = cjson.decode(job)
-          json['dequeued_at'] = timestamp
-
-          ret = cjson.encode(json)
-
-          redis.call('lpush', 'queue:' .. queue_name .. ':processing:' .. global_name, ret)
-          redis.call('zrem', 'queue:' .. queue_name, job)
+        if job_id then
+          job = redis.call('hget', 'queue:' .. queue_name .. ':jobs', job_id)
         end
 
-        return ret
+        if job then
+          redis.call('lpush', 'queue:' .. queue_name .. ':processing:' .. global_name, job_id)
+          redis.call('zrem', 'queue:' .. queue_name, job_id)
+        end
+
+        return job
       EOF
 
       redis.eval(@dequeue_script, argv: [queue_name, global_name, Time.now.utc.strftime("%F")])
@@ -176,14 +176,14 @@ module BBQue
         local queue_name, global_name = ARGV[1], ARGV[2]
         local count = 0
 
-        local job = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
+        local job_id = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
 
-        while job do
-          redis.call('lpush', 'queue:' .. queue_name .. ':retry', job)
+        while job_id do
+          redis.call('lpush', 'queue:' .. queue_name .. ':retry', job_id)
 
           count = count + 1
 
-          job = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
+          job_id = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
         end
 
         local notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)

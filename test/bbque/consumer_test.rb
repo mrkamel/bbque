@@ -78,7 +78,10 @@ class BBQue::ConsumerTest < BBQue::TestCase
 
     producer.enqueue(Job.new("job1"))
 
-    redis.lpush("queue:queue_name:retry", JSON.dump(job: BBQue::Serializer.dump(Job.new("job2"))))
+    job_id = SecureRandom.hex
+
+    redis.lpush("queue:queue_name:retry", job_id)
+    redis.hset("queue:queue_name:jobs", job_id, JSON.dump(job: BBQue::Serializer.dump(Job.new("job2"))))
     redis.lpush("queue:queue_name:notify", "1")
 
     consumer.run_once
@@ -100,13 +103,11 @@ class BBQue::ConsumerTest < BBQue::TestCase
 
     assert_equal 0, redis.zcard("queue:queue_name:processing:consumer")
     assert_equal 1, redis.llen("queue:queue_name:notify")
-    assert_equal 1, redis.zcard("queue:queue_name")
 
     assert consumer.send(:dequeue)
 
     assert_equal 1, redis.llen("queue:queue_name:processing:consumer")
     assert_equal 1, redis.llen("queue:queue_name:notify")
-    assert_equal 0, redis.zcard("queue:queue_name")
 
     redis.lpush "queue:queue_name:notifications:consumer", "1"
 
@@ -124,16 +125,18 @@ class BBQue::ConsumerTest < BBQue::TestCase
     producer = BBQue::Producer.new("queue_name", redis: redis)
     consumer = BBQue::Consumer.new("queue_name", redis: redis, global_name: "consumer")
 
-    producer.enqueue Job.new("job"), job_key: "job_key", limit: 1
+    job_id = producer.enqueue(Job.new("job"), job_key: "job_key", limit: 1)
 
+    assert redis.hexists("queue:queue_name:jobs", job_id)
+    assert redis.zscore("queue:queue_name", job_id)
     assert_equal 1, redis.llen("queue:queue_name:notify")
-    assert_equal 1, redis.zcard("queue:queue_name")
     assert_equal "1", redis.hget("queue:queue_name:limits", "job_key")
 
     consumer.run_once
 
+    refute redis.hexists("queue:queue_name:jobs", job_id)
+    assert_nil redis.zscore("queue:queue_name", job_id)
     assert_equal 0, redis.llen("queue:queue_name:notify")
-    assert_equal 0, redis.zcard("queue:queue_name")
     assert_equal 0, redis.zcard("queue:queue_name:processing:consumer")
     assert_equal 0, redis.zcard("queue:queue_name:notifications:consumer")
     assert_nil redis.hget("queue:queue_name:limits", "job_key")

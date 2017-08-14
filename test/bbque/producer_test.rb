@@ -12,12 +12,15 @@ class BBQue::ProducerTest < BBQue::TestCase
     producer = BBQue::Producer.new("queue_name")
 
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
+    assert_equal 0, producer.redis.hlen("queue:queue_name:jobs")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
 
-    producer.enqueue Job.new
+    job_id = producer.enqueue(Job.new)
+
+    assert producer.redis.hexists("queue:queue_name:jobs", job_id)
+    assert producer.redis.zscore("queue:queue_name", job_id)
 
     assert_equal 1, producer.redis.llen("queue:queue_name:notify")
-    assert_equal 1, producer.redis.zcard("queue:queue_name")
   end
 
   def test_enqueue_with_limit
@@ -39,13 +42,27 @@ class BBQue::ProducerTest < BBQue::TestCase
 
     assert_equal 0, producer.redis.zcard("bbque:scheduler")
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
+    assert_equal 0, producer.redis.hlen("queue:queue_name:jobs")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
 
     producer.enqueue Job.new, delay: 30
 
     assert_equal 1, producer.redis.zcard("bbque:scheduler")
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
+    assert_equal 0, producer.redis.hlen("queue:queue_name:jobs")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
+  end
+
+  def test_list
+    producer = BBQue::Producer.new("queue_name")
+
+    producer.enqueue Job.new
+
+    assert_equal 1, producer.list.count
+
+    producer.enqueue Job.new
+
+    assert_equal 2, producer.list.count
   end
 end
 

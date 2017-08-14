@@ -1,9 +1,10 @@
 
 module BBQue
   class Scheduler
-    attr_accessor :redis, :logger
+    attr_accessor :interval, :redis, :logger
 
-    def initialize(redis: Redis.new, logger: Logger.new("/dev/null"))
+    def initialize(interval: 60, redis: Redis.new, logger: Logger.new("/dev/null"))
+      self.interval = interval
       self.redis = redis
       self.logger = logger
     end
@@ -20,7 +21,7 @@ module BBQue
       until @stopping
         schedule
 
-        sleep 60
+        sleep interval
       end
     end
 
@@ -41,7 +42,8 @@ module BBQue
             if score <= timestamp then
               local job = cjson.decode(value)
 
-              redis.call('zadd', 'queue:' .. job['queue'], tonumber(string.format('%i%013i', tonumber(job['pri']), redis.call('zcard', 'queue:' .. job['queue']))), job['value'])
+              redis.call('zadd', 'queue:' .. job['queue'], tonumber(string.format('%i%013i', tonumber(job['pri']), redis.call('zcard', 'queue:' .. job['queue']))), job['job_id'])
+              redis.call('hset', 'queue:' .. job['queue'] .. ':jobs', job['job_id'], job['value'])
               redis.call('rpush', 'queue:' .. job['queue'] .. ':notify', '1')
               redis.call('zrem', 'bbque:scheduler', value)
 

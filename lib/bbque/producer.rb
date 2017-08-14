@@ -12,6 +12,24 @@ module BBQue
       self.logger = logger
     end
 
+    def list
+      return enum_for(:list) unless block_given?
+
+      redis.zscan_each("queue:#{queue_name}").each_slice(100) do |slice|
+        redis.hmget("queue:#{queue_name}:jobs", slice.map(&:first)).each do |json|
+          job = JSON.parse(json)
+
+          yield(
+            job_id: job["job_id"],
+            job_key: job["job_key"],
+            pri: job["pri"],
+            enqueued_at: job["enqueued_at"],
+            job: BBQue.serializer.load(job["job"])
+          )
+        end
+      end
+    end
+
     def enqueue(object, pri: 0, job_key: nil, limit: nil, delay: nil)
       logger.info "Enqueue #{object.inspect} on #{queue_name.inspect}"
 
@@ -23,7 +41,7 @@ module BBQue
 
       begin
         @enqueue_script ||=<<-EOF
-          local queue_name, pri, value, job_key, limit, delay = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], tonumber(ARGV[5]), tonumber(ARGV[6])
+          local queue_name, pri, value, job_id, job_key, limit, delay = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], ARGV[5], tonumber(ARGV[6]), tonumber(ARGV[7])
 
           if limit > 0 and job_key ~= '' then
             if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, 1) > limit then
@@ -34,19 +52,22 @@ module BBQue
           end
 
           if delay then
-            redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, pri = pri, value = value }))
+            redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, pri = pri, job_id = job_id, value = value }))
           else
-            redis.call('zadd', 'queue:' .. queue_name, tonumber(string.format('%i%013i', pri, redis.call('zcard', 'queue:' .. queue_name))), value)
+            redis.call('zadd', 'queue:' .. queue_name, tonumber(string.format('%i%013i', pri, redis.call('zcard', 'queue:' .. queue_name))), job_id)
+            redis.call('hset', 'queue:' .. queue_name .. ':jobs', job_id, value)
             redis.call('lpush', 'queue:' .. queue_name .. ':notify', '1')
           end
 
           return true
         EOF
 
+        job_id = SecureRandom.hex
+
         value = {}
         value[:enqueued_at] = Time.now.utc.strftime("%F")
         value[:job_key] = job_key
-        value[:job_id] = SecureRandom.hex
+        value[:job_id] = job_id
         value[:pri] = pri
         value[:job] = serialized_object
 
@@ -56,6 +77,7 @@ module BBQue
             queue_name,
             pri,
             JSON.generate(value),
+            job_id,
             job_key,
             limit || 0,
             delay.to_i > 0 ? Time.now.to_i + delay.to_i : nil
@@ -67,7 +89,7 @@ module BBQue
         raise EnqueueError, e.message
       end
 
-      true
+      job_id
     end
   end
 end
