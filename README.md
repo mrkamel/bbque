@@ -85,7 +85,7 @@ and run it via:
     $ bbque jobs.rb
 
 BBQue will loop through all the jobs, run them, and will then wait for new
-ones (no polling). You can pass multiple queue names, the Redis instance and a logger.
+ones (no polling). You can pass the queue name, the Redis instance and a logger.
 
 ```ruby
 BBQue::Consumer.new(["default", "important"], logger: ..., redis: ...).run
