@@ -10,15 +10,7 @@ module BBQue
     end
 
     def run
-      trap "QUIT" do
-        @stopping = true
-      end
-
-      trap "USR2" do
-        @stopping = true
-      end
-
-      until @stopping
+      loop do
         schedule
 
         sleep interval
