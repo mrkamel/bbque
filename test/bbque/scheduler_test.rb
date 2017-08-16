@@ -12,6 +12,7 @@ class BBQue::SchedulerTest < BBQue::TestCase
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
     assert_equal 1, producer.redis.zcard("bbque:scheduler")
+    assert_equal 1, producer.redis.hlen("bbque:scheduler:jobs")
 
     scheduler = BBQue::Scheduler.new
 
@@ -20,12 +21,14 @@ class BBQue::SchedulerTest < BBQue::TestCase
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
     assert_equal 1, producer.redis.zcard("bbque:scheduler")
+    assert_equal 1, producer.redis.hlen("bbque:scheduler:jobs")
 
     scheduler.schedule(Time.now.to_i + 61)
 
     assert_equal 1, producer.redis.llen("queue:queue_name:notify")
     assert_equal 1, producer.redis.zcard("queue:queue_name")
     assert_equal 0, producer.redis.zcard("bbque:scheduler")
+    assert_equal 0, producer.redis.hlen("bbque:scheduler:jobs")
   end
 end
  

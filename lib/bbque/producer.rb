@@ -52,7 +52,8 @@ module BBQue
           end
 
           if delay then
-            redis.call('zadd', 'bbque:scheduler', delay, cjson.encode({ queue = queue_name, pri = pri, job_id = job_id, value = value }))
+            redis.call('hset', 'bbque:scheduler:jobs', job_id, cjson.encode({ queue = queue_name, pri = pri, job_id = job_id, value = value }))
+            redis.call('zadd', 'bbque:scheduler', delay, job_id)
           else
             redis.call('zadd', 'queue:' .. queue_name, tonumber(string.format('%i%013i', 0 - pri, redis.call('zcard', 'queue:' .. queue_name))), job_id)
             redis.call('hset', 'queue:' .. queue_name .. ':jobs', job_id, value)

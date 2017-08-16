@@ -41,6 +41,7 @@ class BBQue::ProducerTest < BBQue::TestCase
     producer = BBQue::Producer.new("queue_name")
 
     assert_equal 0, producer.redis.zcard("bbque:scheduler")
+    assert_equal 0, producer.redis.hlen("bbque:scheduler:jobs")
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
     assert_equal 0, producer.redis.hlen("queue:queue_name:jobs")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
@@ -48,6 +49,7 @@ class BBQue::ProducerTest < BBQue::TestCase
     producer.enqueue Job.new, delay: 30
 
     assert_equal 1, producer.redis.zcard("bbque:scheduler")
+    assert_equal 1, producer.redis.hlen("bbque:scheduler:jobs")
     assert_equal 0, producer.redis.llen("queue:queue_name:notify")
     assert_equal 0, producer.redis.hlen("queue:queue_name:jobs")
     assert_equal 0, producer.redis.zcard("queue:queue_name")
