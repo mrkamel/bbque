@@ -17,6 +17,27 @@ module BBQue
       end
     end
 
+    def list
+      return enum_for(:list) unless block_given?
+
+      redis.zscan_each("bbque:scheduler").each_slice(100) do |slice|
+        redis.hmget("bbque:scheduler:jobs", slice.map(&:first)).each do |json|
+          wrapped_job = JSON.parse(json)
+          job = JSON.parse(wrapped_job["value"])
+
+          yield(
+            queue: wrapped_job["queue"],
+            job_id: job["job_id"],
+            job_key: job["job_key"],
+            pri: job["pri"],
+            enqueued_at: job["enqueued_at"],
+            delay: job["delay"],
+            job: BBQue.serializer.load(job["job"])
+          )
+        end
+      end
+    end
+
     def schedule(time = Time.now.to_i)
       @schedule_script ||=<<-EOF
         local timestamp = tonumber(ARGV[1])

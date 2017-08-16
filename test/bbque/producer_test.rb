@@ -5,7 +5,7 @@ class BBQue::ProducerTest < BBQue::TestCase
   class Job; end
 
   def test_initialize
-    BBQue::Producer.new("queue", redis: Redis.new, logger: Logger.new("/dev/null"))
+    BBQue::Producer.new("queue", logger: Logger.new("/dev/null"))
   end
 
   def test_enqueue

@@ -30,5 +30,18 @@ class BBQue::SchedulerTest < BBQue::TestCase
     assert_equal 0, producer.redis.zcard("bbque:scheduler")
     assert_equal 0, producer.redis.hlen("bbque:scheduler:jobs")
   end
+
+  def test_list
+    producer = BBQue::Producer.new("queue_name")
+    scheduler = BBQue::Scheduler.new
+
+    producer.enqueue Job.new, delay: 10
+
+    assert_equal 1, scheduler.list.count
+
+    producer.enqueue Job.new, delay: 10
+
+    assert_equal 2, scheduler.list.count
+  end
 end
  

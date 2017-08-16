@@ -70,6 +70,7 @@ module BBQue
         value[:job_key] = job_key
         value[:job_id] = job_id
         value[:pri] = pri
+        value[:delay] = delay if delay
         value[:job] = serialized_object
 
         result = redis.eval(
