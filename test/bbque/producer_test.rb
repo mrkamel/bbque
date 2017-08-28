@@ -66,5 +66,17 @@ class BBQue::ProducerTest < BBQue::TestCase
 
     assert_equal 2, producer.list.count
   end
+
+  def test_size
+    producer = BBQue::Producer.new("queue_name")
+
+    producer.enqueue Job.new
+
+    assert_equal 1, producer.size
+
+    producer.enqueue Job.new
+
+    assert_equal 2, producer.size
+  end
 end
 

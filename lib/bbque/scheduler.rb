@@ -38,6 +38,10 @@ module BBQue
       end
     end
 
+    def size
+      redis.zcard("bbque:scheduler")
+    end
+
     def schedule(time = Time.now.to_i)
       @schedule_script ||=<<-EOF
         local timestamp = tonumber(ARGV[1])

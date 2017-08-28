@@ -43,5 +43,18 @@ class BBQue::SchedulerTest < BBQue::TestCase
 
     assert_equal 2, scheduler.list.count
   end
+
+  def test_size
+    producer = BBQue::Producer.new("queue_name")
+    scheduler = BBQue::Scheduler.new
+
+    producer.enqueue Job.new, delay: 10
+
+    assert_equal 1, scheduler.size
+
+    producer.enqueue Job.new, delay: 10
+
+    assert_equal 2, scheduler.size
+  end
 end
  

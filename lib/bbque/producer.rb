@@ -30,6 +30,10 @@ module BBQue
       end
     end
 
+    def size
+      redis.zcard("queue:#{queue_name}")
+    end
+
     def enqueue(object, pri: 0, job_key: nil, limit: nil, delay: nil)
       logger.info "Enqueue #{object.inspect} on #{queue_name.inspect}"
 
