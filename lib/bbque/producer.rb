@@ -45,7 +45,7 @@ module BBQue
 
       begin
         @enqueue_script ||=<<-EOF
-          local queue_name, pri, value, job_id, job_key, limit, delay = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], ARGV[5], tonumber(ARGV[6]), tonumber(ARGV[7])
+          local queue_name, pri, value, job_id, job_key, limit, delay_timestamp = ARGV[1], tonumber(ARGV[2]), ARGV[3], ARGV[4], ARGV[5], tonumber(ARGV[6]), tonumber(ARGV[7])
 
           if limit > 0 and job_key ~= '' then
             if redis.call('hincrby', 'queue:' .. queue_name .. ':limits', job_key, 1) > limit then
@@ -55,9 +55,9 @@ module BBQue
             end
           end
 
-          if delay then
+          if delay_timestamp then
             redis.call('hset', 'bbque:scheduler:jobs', job_id, cjson.encode({ queue = queue_name, pri = pri, job_id = job_id, value = value }))
-            redis.call('zadd', 'bbque:scheduler', delay, job_id)
+            redis.call('zadd', 'bbque:scheduler', delay_timestamp, job_id)
           else
             redis.call('zadd', 'queue:' .. queue_name, tonumber(string.format('%i%013i', 0 - pri, redis.call('zcard', 'queue:' .. queue_name))), job_id)
             redis.call('hset', 'queue:' .. queue_name .. ':jobs', job_id, value)

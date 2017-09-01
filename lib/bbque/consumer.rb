@@ -54,16 +54,23 @@ module BBQue
       @wakeup_queue = Queue.new
     end
 
+    def setup_traps
+      trap("QUIT") { stop }
+      trap("USR2") { stop }
+    end
+
+    def stop
+      Thread.new do
+        @stop_mutex.synchronize do
+          @stopping = true
+        end
+
+        @wakeup_queue.enq(nil)
+      end
+    end
+
     def run
       cleanup
-
-      trap "QUIT" do
-        Thread.new { stop }
-      end
-
-      trap "USR2" do
-        Thread.new { stop }
-      end
 
       until stopping?
         run_once
@@ -100,14 +107,6 @@ module BBQue
     end
 
     private
-
-    def stop
-      @stop_mutex.synchronize do
-        @stopping = true
-      end
-
-      @wakeup_queue.enq(nil)
-    end
 
     def stopping?
       @stop_mutex.synchronize do
@@ -174,14 +173,11 @@ module BBQue
     def cleanup
       @cleanup_script =<<-EOF
         local queue_name, global_name = ARGV[1], ARGV[2]
-        local count = 0
 
         local job_id = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
 
         while job_id do
-          redis.call('lpush', 'queue:' .. queue_name .. ':retry', job_id)
-
-          count = count + 1
+          redis.call('rpush', 'queue:' .. queue_name .. ':retry', job_id)
 
           job_id = redis.call('rpop', 'queue:' .. queue_name .. ':processing:' .. global_name)
         end
@@ -189,12 +185,10 @@ module BBQue
         local notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
 
         while notification do
-          redis.call('lpush', 'queue:' .. queue_name .. ':notify', notification)
+          redis.call('rpush', 'queue:' .. queue_name .. ':notify', notification)
 
           notification = redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
         end
-
-        return count
       EOF
 
       redis.eval(@cleanup_script, argv: [queue_name, global_name])

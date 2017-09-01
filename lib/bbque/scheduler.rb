@@ -11,7 +11,9 @@ module BBQue
 
     def run
       loop do
-        schedule
+        while schedule > 0
+          # nothing
+        end
 
         sleep interval
       end
@@ -48,34 +50,27 @@ module BBQue
         local count = 0
 
         local job_ids_with_scores = redis.call('zrange', 'bbque:scheduler', 0, 100, 'withscores')
+        local i = 1
 
-        while job_ids_with_scores[1] do
-          local i = 1
+        while job_ids_with_scores[i] do
+          local job_id = job_ids_with_scores[i]
 
-          while job_ids_with_scores[i] do
-            local job_id = job_ids_with_scores[i]
+          local value = redis.call('hget', 'bbque:scheduler:jobs', job_id)
+          local score = tonumber(job_ids_with_scores[i + 1])
 
-            local value = redis.call('hget', 'bbque:scheduler:jobs', job_id)
-            local score = tonumber(job_ids_with_scores[i + 1])
+          if score > timestamp then break end
 
-            if score <= timestamp then
-              local job = cjson.decode(value)
+          local job = cjson.decode(value)
 
-              redis.call('zadd', 'queue:' .. job['queue'], tonumber(string.format('%i%013i', tonumber(job['pri']), redis.call('zcard', 'queue:' .. job['queue']))), job_id)
-              redis.call('hset', 'queue:' .. job['queue'] .. ':jobs', job_id, job['value'])
-              redis.call('rpush', 'queue:' .. job['queue'] .. ':notify', '1')
-              redis.call('zrem', 'bbque:scheduler', job_id)
-              redis.call('hdel', 'bbque:scheduler:jobs', job_id)
+          redis.call('zadd', 'queue:' .. job['queue'], tonumber(string.format('%i%013i', tonumber(job['pri']), redis.call('zcard', 'queue:' .. job['queue']))), job_id)
+          redis.call('hset', 'queue:' .. job['queue'] .. ':jobs', job_id, job['value'])
+          redis.call('rpush', 'queue:' .. job['queue'] .. ':notify', '1')
+          redis.call('zrem', 'bbque:scheduler', job_id)
+          redis.call('hdel', 'bbque:scheduler:jobs', job_id)
 
-              i = i + 2
+          i = i + 2
 
-              count = count + 1
-            else
-              return count
-            end
-          end
-
-          job_ids_with_scores = redis.call('zrange', 'bbque:scheduler', 0, 100, 'withscores')
+          count = count + 1
         end
 
         return count
