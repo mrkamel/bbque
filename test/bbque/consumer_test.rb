@@ -50,7 +50,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
   def test_run_empty
     redis = Redis.new
 
-    BBQue::Consumer.new("queue", global_name: "consumer").run_once(timeout: 1)
+    BBQue::Consumer.new("queue", global_name: "consumer").run_once
 
     assert_equal [], redis.lrange("results", 0, -1)
   end

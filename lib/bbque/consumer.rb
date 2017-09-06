@@ -48,6 +48,8 @@ module BBQue
       self.redis = redis
       self.logger = logger
 
+      @blocking_redis = redis.dup
+
       @stop_mutex = Mutex.new
       @stopping = false
 
@@ -72,19 +74,23 @@ module BBQue
     def run
       cleanup
 
-      until stopping?
-        run_once
-      end
+      run_once until stopping?
 
       cleanup
     end
 
-    def run_once(timeout: 5)
-      await_wakeup(timeout)
+    def run_once
+      await_wakeup
 
       return if stopping?
 
-      value = dequeue
+      value = begin
+        dequeue
+      rescue
+        cleanup
+
+        nil
+      end
 
       return unless value
 
@@ -114,9 +120,9 @@ module BBQue
       end
     end
 
-    def await_wakeup(timeout)
+    def await_wakeup
       Thread.new do
-        @wakeup_queue.enq redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", timeout)
+        @wakeup_queue.enq @blocking_redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", 5)
       end
 
       @wakeup_queue.deq
@@ -138,6 +144,12 @@ module BBQue
       EOF
 
       redis.eval(@delete_script, argv: [queue_name, job_id, global_name, job_key])
+    rescue => e
+      logger.error e
+
+      sleep 5
+
+      retry
     end
 
     def dequeue
