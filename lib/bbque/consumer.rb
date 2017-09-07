@@ -77,6 +77,7 @@ module BBQue
       run_once until stopping?
 
       cleanup
+      notify
     end
 
     def run_once
@@ -104,15 +105,23 @@ module BBQue
       logger.info "Job #{job.inspect} on #{queue_name.inspect} finished"
 
       delete(json["job_id"], job_key: json["job_key"])
-    rescue Redis::BaseError => e
+    rescue => e
       logger.error e
 
       sleep 5
-    rescue => e
-      logger.error e
     end
 
     private
+
+    def notify
+      redis.lpush("queue:#{queue_name}:notify", "1")
+    rescue => e
+      logger.error e
+
+      sleep 5
+
+      retry
+    end
 
     def stopping?
       @stop_mutex.synchronize do
@@ -122,7 +131,17 @@ module BBQue
 
     def await_wakeup
       Thread.new do
-        @wakeup_queue.enq @blocking_redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", 5)
+        begin
+          @wakeup_queue.enq @blocking_redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", 5)
+        rescue => e
+          logger.error e
+
+          sleep 5
+
+          cleanup
+
+          retry
+        end
       end
 
       @wakeup_queue.deq
