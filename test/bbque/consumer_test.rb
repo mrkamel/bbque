@@ -78,7 +78,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
 
     producer.enqueue(Job.new("job1"))
 
-    job_id = SecureRandom.hex
+    job_id = BBQue::Producer.generate_job_id
 
     redis.lpush("queue:queue_name:retry", job_id)
     redis.hset("queue:queue_name:jobs", job_id, JSON.dump(job: BBQue::Serializer.dump(Job.new("job2"))))

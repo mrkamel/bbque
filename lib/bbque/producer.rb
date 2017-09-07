@@ -12,6 +12,10 @@ module BBQue
       self.logger = logger
     end
 
+    def self.generate_job_id
+      Digest::SHA256.hexdigest("#{rand}:#{Time.now.to_f}")
+    end
+
     def list
       return enum_for(:list) unless block_given?
 
@@ -67,7 +71,7 @@ module BBQue
           return true
         EOF
 
-        job_id = SecureRandom.hex
+        job_id = self.class.generate_job_id
 
         value = {}
         value[:enqueued_at] = Time.now.utc.strftime("%F")
