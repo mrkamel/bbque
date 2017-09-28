@@ -77,6 +77,12 @@ module BBQue
       EOF
 
       redis.eval(@schedule_script, argv: [time])
+    rescue => e
+      logger.error e
+
+      sleep 5
+
+      retry
     end
   end
 end

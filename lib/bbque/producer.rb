@@ -13,7 +13,7 @@ module BBQue
     end
 
     def self.generate_job_id
-      Digest::SHA256.hexdigest("#{rand}:#{Time.now.to_f}")
+      Digest::SHA256.hexdigest("#{rand}:#{Time.now.to_f}")[0 .. 31]
     end
 
     def list
