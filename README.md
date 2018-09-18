@@ -123,11 +123,37 @@ ForkingConsumer.new(["queue1", "queue2", ...], ...).run
 
 ## Job Limit
 
-TODO
+You can specify a `limit` for a job, such that no more than `limit` instances
+of the same job can be concurrently enqueued. You need to pass a `job_key` as
+well, such that BBQue can determine duplicate jobs:
 
-## Delay
+```ruby
+MyQueue.enqueue MyJob.new, limit: 1, job_key: "my_singleton_job"
+```
 
-TODO
+
+## Delay/Scheduler
+
+You can enqueue jobs while specifing a delay:
+
+```ruby
+MyQueue.enqueue MyJob.new, delay: 60
+```
+
+When using `delay`, jobs are added to a special queue, such that
+you need to start a scheduler process, which regularly checks for
+delayed jobs, checks whether the delay has passed and subsequently
+moves the jobs from the delay queue to its target queue.
+
+```ruby
+BBQue::Scheduler.new(redis: Redis.new, logger: Rails.logger).run
+```
+
+## Safety
+
+BBQue implements job safety measures similar to sidekiq's `super_fetch`. BBQue
+is using `BRPOPLPUSH` and when a job is fetched, it is added to a `processing`
+queue, such that lost jobs get rescued on worker restart.
 
 ## Graceful Termination
 
