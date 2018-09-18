@@ -4,8 +4,10 @@
 [![Gem Version](https://badge.fury.io/rb/bbque.svg)](http://badge.fury.io/rb/bbque)
 
 BBQue is an opinionated ruby gem to queue and process background jobs. Other
-gems for this purpose usually don't work with ruby objects and serialize method
-arguments only. Instead, BBQue jobs are simple ruby objects:
+gems for this purpose usually don't work with ruby objects, serialize method
+arguments only and/or have strong reliability options only in paid/pro versions.
+
+BBQue jobs are simple ruby objects:
 
 ```ruby
 MyQueue.enqueue MyJob.new
