@@ -151,12 +151,12 @@ BBQue::Scheduler.new(redis: Redis.new, logger: Rails.logger).run
 
 ## Safety
 
-Regarding Redis issues, BBQue implements job safety measures similar to
-sidekiq's `super_fetch`. BBQue is using `BRPOPLPUSH` and when a job is fetched,
-it is added to a `processing` queue, such that lost jobs get rescued on worker
+Regarding Redis issues, BBQue implements job safety measures similar to sidekiq
+pro's `super_fetch`. BBQue is using `BRPOPLPUSH` and when a job is fetched, it
+is added to a `processing` queue, such that lost jobs get rescued on worker
 restart.
 
-BBque, howoever, doesn't offer any retry mechanisms for failed jobs, ie jobs
+BBQue, howoever, doesn't offer any retry mechanisms for failed jobs, ie jobs
 raising exceptions. You are responsible for rescuing exceptions within your
 jobs and taking appropriate measures.
 
