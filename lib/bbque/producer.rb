@@ -1,9 +1,6 @@
 
 module BBQue
   class Producer
-    class JobLimitError < StandardError; end
-    class EnqueueError < StandardError; end
-
     attr_accessor :queue_name, :redis, :logger
 
     def initialize(queue_name, redis: Redis.new, logger: Logger.new("/dev/null"))
@@ -94,9 +91,9 @@ module BBQue
           ]
         )
 
-        raise(JobLimitError) if result == "TOO MANY"
+        raise(BBQue::JobLimitError) if result == "TOO MANY"
       rescue Redis::BaseError => e
-        raise EnqueueError, e.message
+        raise BBQue::EnqueueError, e.message
       end
 
       job_id

@@ -36,7 +36,7 @@ class BBQue::ProducerTest < BBQue::TestCase
 
     assert_equal "1", redis.hget("queue:queue_name:limits", "job_key")
 
-    assert_raises BBQue::Producer::JobLimitError do
+    assert_raises BBQue::JobLimitError do
       producer.enqueue Job.new, job_key: "job_key", limit: 1
     end
   end
