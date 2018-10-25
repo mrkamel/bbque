@@ -73,6 +73,7 @@ module BBQue
 
     def run
       cleanup
+      notify
 
       run_once until stopping?
 
@@ -113,10 +114,24 @@ module BBQue
 
     private
 
+    def with_retry
+      yield
+    rescue => e
+      logger.error e
+
+      return if stopping? && e.is_a?(Redis::CannotConnectError)
+
+      sleep 5
+
+      retry
+    end
+
     def notify
       redis.lpush("queue:#{queue_name}:notify", "1")
     rescue => e
       logger.error e
+
+      return if stopping? && e.is_a?(Redis::CannotConnectError)
 
       sleep 5
 
@@ -136,11 +151,15 @@ module BBQue
         rescue => e
           logger.error e
 
-          sleep 5
+          if stopping? && e.is_a?(Redis::CannotConnectError)
+            @wakeup_queue.enq nil
+          else
+            sleep 5
 
-          cleanup
+            cleanup
 
-          retry
+            retry
+          end
         end
       end
 
@@ -166,7 +185,13 @@ module BBQue
     rescue => e
       logger.error e
 
+      return if stopping? && e.is_a?(Redis::CannotConnectError)
+
       sleep 5
+
+      # Re-notify, because we potentially lost a notification
+
+      notify
 
       retry
     end
@@ -193,6 +218,8 @@ module BBQue
         if job then
           redis.call('lpush', 'queue:' .. queue_name .. ':processing:' .. global_name, job_id)
           redis.call('zrem', 'queue:' .. queue_name, job_id)
+        else
+          redis.call('rpop', 'queue:' .. queue_name .. ':notifications:' .. global_name)
         end
 
         return job
@@ -225,6 +252,8 @@ module BBQue
       redis.eval(@cleanup_script, argv: [queue_name, global_name])
     rescue Redis::BaseError => e
       logger.error e
+
+      return if stopping? && e.is_a?(Redis::CannotConnectError)
 
       sleep 5
 
