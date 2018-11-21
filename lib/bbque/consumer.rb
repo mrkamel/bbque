@@ -57,8 +57,9 @@ module BBQue
     end
 
     def setup_traps
-      trap("QUIT") { stop }
-      trap("USR2") { stop }
+      ["QUIT", "USR2", "INT"].each do |signal|
+        trap(signal) { stop }
+      end
     end
 
     def stop
@@ -163,7 +164,7 @@ module BBQue
         end
       end
 
-      @wakeup_queue.deq
+      Thread.new { @wakeup_queue.deq }.value # Use a thread to avoid false positive deadlock detection
     end
 
     def delete(job_id, job_key:)
