@@ -57,7 +57,7 @@ module BBQue
     end
 
     def setup_traps
-      ["QUIT", "USR2", "INT"].each do |signal|
+      ["QUIT", "USR2", "INT", "TERM"].each do |signal|
         trap(signal) { stop }
       end
     end

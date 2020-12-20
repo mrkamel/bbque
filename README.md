@@ -164,8 +164,8 @@ jobs and taking appropriate measures.
 
 ## Graceful Termination
 
-You can stop a worker gracefully by sending a QUIT signal to it.
-The worker will finish its current job and terminate afterwards.
+You can stop a worker gracefully by sending a QUIT, TERM, INT or USR2 signal to
+it. The worker will finish its current job and terminate afterwards.
 
 ## Contributing
 
