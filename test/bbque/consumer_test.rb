@@ -50,7 +50,8 @@ class BBQue::ConsumerTest < BBQue::TestCase
   def test_run_empty
     redis = Redis.new
 
-    BBQue::Consumer.new("queue", global_name: "consumer", redis: redis).run_once
+    consumer = BBQue::Consumer.new("queue", global_name: "consumer", redis: redis)
+    consumer.run_once
 
     assert_equal [], redis.lrange("results", 0, -1)
   end
@@ -81,7 +82,7 @@ class BBQue::ConsumerTest < BBQue::TestCase
     job_id = BBQue::Producer.generate_job_id
 
     redis.lpush("queue:queue_name:retry", job_id)
-    redis.hset("queue:queue_name:jobs", job_id, JSON.dump(job: BBQue::Serializer.dump(Job.new("job2"))))
+    redis.hset("queue:queue_name:jobs", job_id, JSON.dump(job_id: '1', job: BBQue::Serializer.dump(Job.new("job2"))))
     redis.lpush("queue:queue_name:notify", "1")
 
     consumer.run_once

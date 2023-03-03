@@ -56,7 +56,7 @@ module BBQue
             end
           end
 
-          if delay_timestamp then
+          if delay_timestamp > 0 then
             redis.call('hset', 'bbque:scheduler:jobs', job_id, cjson.encode({ queue = queue_name, pri = pri, job_id = job_id, value = value }))
             redis.call('zadd', 'bbque:scheduler', delay_timestamp, job_id)
           else
@@ -85,9 +85,9 @@ module BBQue
             pri,
             JSON.generate(value),
             job_id,
-            job_key,
+            job_key.to_s,
             limit || 0,
-            delay.to_i > 0 ? Time.now.to_i + delay.to_i : nil
+            delay.to_i > 0 ? Time.now.to_i + delay.to_i : 0
           ]
         )
 

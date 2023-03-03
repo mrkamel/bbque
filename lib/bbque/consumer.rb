@@ -148,7 +148,7 @@ module BBQue
     def await_wakeup
       Thread.new do
         begin
-          @wakeup_queue.enq @blocking_redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", 5)
+          @wakeup_queue.enq @blocking_redis.brpoplpush("queue:#{queue_name}:notify", "queue:#{queue_name}:notifications:#{global_name}", timeout: 5)
         rescue => e
           logger.error e
 
@@ -182,7 +182,7 @@ module BBQue
         end
       EOF
 
-      redis.eval(@delete_script, argv: [queue_name, job_id, global_name, job_key])
+      redis.eval(@delete_script, argv: [queue_name, job_id, global_name, job_key.to_s])
     rescue => e
       logger.error e
 
